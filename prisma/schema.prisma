@@ -1,0 +1,494 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TipoCompromisso {
+  REUNIAO
+  CONSULTA
+  ENTREGA
+  EVENTO
+  PESSOAL
+  PROFISSIONAL
+  OUTRO
+}
+
+enum RecorrenciaTipo {
+  NENHUMA
+  DIARIA
+  SEMANAL
+  QUINZENAL
+  MENSAL
+  ANUAL
+}
+
+enum CategoriaServico {
+  STREAMING
+  SOFTWARE
+  HOSPEDAGEM
+  DOMINIO
+  EDUCACAO
+  BANCO
+  REDES_SOCIAIS
+  UTILITARIO
+  OUTRO
+}
+
+enum StatusServico {
+  ATIVO
+  PAUSADO
+  CANCELADO
+  ATRASADO
+}
+
+enum StatusConta {
+  A_PAGAR
+  PAGA
+  ATRASADA
+  CANCELADA
+}
+
+enum Recorrencia {
+  NENHUMA
+  SEMANAL
+  QUINZENAL
+  MENSAL
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+enum TipoVinculo {
+  CLT
+  PJ
+  FREELANCER
+  TEMPORARIO
+  ESTAGIO
+  OUTRO
+}
+
+enum StatusVinculo {
+  ATIVO
+  INATIVO
+  SUSPENSO
+  ENCERRADO
+}
+
+enum TipoDocumentoPrestador {
+  RG
+  CPF
+  CNH
+  COMPROVANTE_RESIDENCIA
+  CONTRATO
+  CERTIFICADO
+  OUTRO
+}
+
+enum Urgencia {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+enum CategoriaProduto {
+  ALIMENTO
+  LIMPEZA
+  HIGIENE
+  FARMACIA
+  CASA
+  ESCRITORIO
+  ELETRONICO
+  ROUPA
+  OUTRO
+}
+
+enum CategoriaMeta {
+  PESSOAL
+  PROFISSIONAL
+  FINANCEIRA
+  SAUDE
+  ESTUDO
+  RELACIONAMENTO
+  OUTRO
+}
+
+enum StatusMeta {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  CONCLUIDA
+  PAUSADA
+  CANCELADA
+}
+
+enum Prioridade {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+enum UploadEntityType {
+  AGENDA
+  SERVICO
+  CONTA
+  PRESTADOR
+  DOCUMENTO_PRESTADOR
+  ITEM_COMPRA
+  META
+  ENTRADA_DIARIO
+  MARCO
+  TEMP
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  emailVerified       DateTime?
+  image               String?
+  accounts            Account[]
+  sessions            Session[]
+  verificationTokens  VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  compromissos        Compromisso[]
+  servicos            Servico[]
+  contas              Conta[]
+  prestadores         Prestador[]
+  documentosPrestador DocumentoPrestador[]
+  itensCompra         ItemCompra[]
+  metas               Meta[]
+  marcos              Marco[]
+  entradasDiario      EntradaDiario[]
+  uploads             Upload[]
+  notifications       Notification[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @id
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([identifier, token])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Compromisso {
+  id             String            @id @default(cuid())
+  userId         String
+  titulo         String
+  descricao      String?
+  local          String?
+  dataInicio     DateTime
+  dataFim        DateTime?
+  diaInteiro     Boolean           @default(false)
+  tipo           TipoCompromisso
+  cor            String?
+  recorrencia    RecorrenciaTipo   @default(NENHUMA)
+  recorrenciaFim DateTime?
+  alertaMinutos  Int?
+  observacao     String?
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([userId, dataInicio])
+  @@index([userId, tipo])
+}
+
+model Servico {
+  id             String           @id @default(cuid())
+  userId         String
+  nome           String
+  logoUploadId   String?          @unique
+  login          String
+  senhaEncrypted String
+  senhaIv        String
+  senhaAuthTag   String
+  url            String?
+  categoria      CategoriaServico
+  valorMensal    Decimal          @db.Decimal(12, 2)
+  diaVencimento  Int
+  status         StatusServico    @default(ATIVO)
+  observacao     String?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logoUpload     Upload?          @relation("ServicoLogo", fields: [logoUploadId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([userId, categoria])
+  @@index([userId, status])
+  @@index([userId, diaVencimento])
+}
+
+model Conta {
+  id            String       @id @default(cuid())
+  userId        String
+  nome          String
+  valor         Decimal      @db.Decimal(12, 2)
+  vencimento    DateTime
+  dataPagamento DateTime?
+  status        StatusConta  @default(A_PAGAR)
+  mesReferencia DateTime
+  recorrencia   Recorrencia  @default(NENHUMA)
+  observacao    String?
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, vencimento])
+  @@index([userId, mesReferencia])
+}
+
+model Prestador {
+  id              String          @id @default(cuid())
+  userId          String
+  nome            String
+  cpf             String?
+  rg              String?
+  dataNascimento  DateTime?
+  naturalidade    String?
+  email           String?
+  telefone        String?
+  cep             String?
+  logradouro      String?
+  numero          String?
+  complemento     String?
+  bairro          String?
+  cidade          String?
+  estado          String?
+  cargo           String?
+  tipoVinculo     TipoVinculo
+  statusVinculo   StatusVinculo   @default(ATIVO)
+  dataInicio      DateTime?
+  dataFim         DateTime?
+  salario         Decimal?        @db.Decimal(12, 2)
+  diaPagamento    Int?
+  formaPagamento  String?
+  pixChave        String?
+  bancoNome       String?
+  bancoAgencia    String?
+  bancoConta      String?
+  observacao      String?
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentos      DocumentoPrestador[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([userId, statusVinculo])
+  @@index([userId, tipoVinculo])
+  @@index([userId, diaPagamento])
+  @@index([userId, nome])
+}
+
+model DocumentoPrestador {
+  id          String                  @id @default(cuid())
+  userId      String
+  prestadorId String
+  tipo        TipoDocumentoPrestador
+  nome        String
+  descricao   String?
+  uploadId    String                  @unique
+  prestador   Prestador               @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upload      Upload                  @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([userId])
+  @@index([userId, prestadorId])
+  @@index([userId, tipo])
+}
+
+model ItemCompra {
+  id            String            @id @default(cuid())
+  userId        String
+  nome          String
+  quantidade    Decimal?          @db.Decimal(10, 2)
+  unidade       String?
+  localCompra   String?
+  urgencia      Urgencia          @default(MEDIA)
+  categoria     CategoriaProduto  @default(OUTRO)
+  observacao    String?
+  comprado      Boolean           @default(false)
+  dataCompra    DateTime?
+  valorEstimado Decimal?          @db.Decimal(12, 2)
+  valorReal     Decimal?          @db.Decimal(12, 2)
+  origemItemId  String?
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origemItem    ItemCompra?       @relation("CompraDuplicada", fields: [origemItemId], references: [id], onDelete: SetNull)
+  derivados     ItemCompra[]      @relation("CompraDuplicada")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([userId, comprado])
+  @@index([userId, urgencia])
+  @@index([userId, categoria])
+}
+
+model Meta {
+  id         String         @id @default(cuid())
+  userId     String
+  titulo     String
+  descricao  String?
+  categoria  CategoriaMeta
+  prazo      DateTime?
+  status     StatusMeta     @default(NAO_INICIADA)
+  prioridade Prioridade     @default(MEDIA)
+  motivacao  String?
+  concluidaEm DateTime?
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marcos     Marco[]
+  diario     EntradaDiario[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, categoria])
+  @@index([userId, prioridade])
+  @@index([userId, prazo])
+}
+
+model Marco {
+  id          String    @id @default(cuid())
+  userId      String
+  metaId      String
+  titulo      String
+  descricao   String?
+  ordem       Int
+  concluido   Boolean   @default(false)
+  concluidoEm DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meta        Meta      @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, metaId])
+  @@index([userId, concluido])
+}
+
+model EntradaDiario {
+  id        String   @id @default(cuid())
+  userId    String
+  metaId    String
+  conteudo  String
+  humor     String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meta      Meta     @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, metaId])
+  @@index([metaId, createdAt])
+}
+
+model Upload {
+  id                 String               @id @default(cuid())
+  userId             String
+  entityType         UploadEntityType
+  entityId           String?
+  modulo             String
+  categoria          String?
+  originalName       String
+  storagePath        String
+  mimeType           String
+  extension          String
+  sizeBytes          Int
+  checksum           String?
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  servicoLogoOf      Servico?             @relation("ServicoLogo")
+  documentoPrestador DocumentoPrestador?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([userId, entityType, entityId])
+  @@index([userId, modulo])
+}
+
+model Notification {
+  id               String           @id @default(cuid())
+  userId           String
+  tipo             NotificationType
+  titulo           String
+  mensagem         String
+  lida             Boolean          @default(false)
+  link             String?
+  referenciaModulo String?
+  referenciaId     String?
+  dispararEm       DateTime?
+  metadata         Json?
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([userId, lida])
+  @@index([userId, dispararEm])
+}
